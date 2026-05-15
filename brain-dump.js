@@ -24,7 +24,7 @@ function bookmarkDir(name) {
   return fm.bookmarkedPath(name);
 }
 
-// ── Helpers: Date / Time ─────────────────────────────────────
+// ── Helpers ─────────────────────────────────────
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
@@ -33,6 +33,51 @@ function todayISO() {
 function currentHHMM() {
   const d = new Date();
   return d.toTimeString().slice(0, 5); // "HH:MM"
+}
+
+function normalizeTags(tags) {
+  return (tags ?? [])
+    .map(t => String(t).replace(/^#/, "").trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function mergeTags(a, b) {
+  return [...new Set([...normalizeTags(a), ...normalizeTags(b)])].sort();
+}
+
+function formatTagsYaml(tags) {
+  const list = normalizeTags(tags);
+  if (list.length === 0) return "";
+  return "tags:\n" + list.map(t => `  - ${t}`).join("\n") + "\n";
+}
+
+function parseLogFile(content) {
+  if (!content.startsWith("---")) {
+    return { fmCore: "type: log\n", body: content, tags: [] };
+  }
+  const end = content.indexOf("---", 3);
+  if (end === -1) {
+    return { fmCore: "type: log\n", body: content, tags: [] };
+  }
+  const fmBlock = content.slice(3, end);
+  const body = content.slice(end + 3);
+
+  const tags = [];
+  const tagsMatch = fmBlock.match(/^tags:\s*\n((?:  - .+\n?)*)/m);
+  if (tagsMatch) {
+    for (const line of tagsMatch[1].split("\n")) {
+      const m = line.match(/^\s*-\s+(.+)\s*$/);
+      if (m) tags.push(m[1].trim());
+    }
+  }
+
+  const fmCore = fmBlock.replace(/^tags:\s*\n(?:  - .+\n?)*/m, "").trim();
+  const fmCoreWithNewline = fmCore.endsWith("\n") ? fmCore : fmCore + "\n";
+  return { fmCore: fmCoreWithNewline, body, tags };
+}
+
+function rebuildLogFile(fmCore, tags, body, newEntry) {
+  return `---\n${fmCore}${formatTagsYaml(tags)}---${body}${newEntry}`;
 }
 
 // ── Model API call ───────────────────────────────────────────
@@ -111,11 +156,10 @@ function writeNote(inboxDir, note) {
 
   let frontmatter = `---\ntype: ${note.type}\ndate: ${note.date}\n`;
   if (note.source) frontmatter += `source: ${note.source}\n`;
+  frontmatter += formatTagsYaml(note.tags);
   frontmatter += `---\n`;
 
-  const tags = note.tags.map(t => `#${t}`).join(" ");
-  const content = `${frontmatter}${note.body.trimEnd()}\n\n${tags}\n`;
-
+  const content = `${frontmatter}${note.body.trimEnd()}\n`;
   fm.writeString(filePath, content);
 }
 
