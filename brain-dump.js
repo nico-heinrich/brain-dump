@@ -120,19 +120,21 @@ function writeNote(inboxDir, note) {
 }
 
 function appendLog(archiveDir, note) {
-  const filename = `${note.title}.md`; // title is already "log - YYYY-MM-DD"
+  const filename = `${note.title}.md`;
   const filePath = fm.joinPath(archiveDir, filename);
 
-  const time  = currentHHMM();
-  const tags  = note.tags.map(t => `#${t}`).join(" ");
-  const entry = `\n## ${time}\n\n${note.body.trimEnd()}\n\n${tags}\n`;
+  const time = currentHHMM();
+  const entry = `\n## ${time}\n\n${note.body.trimEnd()}\n`;
+  const newTags = normalizeTags(note.tags);
 
   if (fm.fileExists(filePath)) {
     const existing = fm.readString(filePath);
-    fm.writeString(filePath, existing + entry);
+    const { fmCore, body, tags } = parseLogFile(existing);
+    const merged = mergeTags(tags, newTags);
+    fm.writeString(filePath, rebuildLogFile(fmCore, merged, body, entry));
   } else {
-    const header = `---\ntype: log\ndate: ${note.date}\n---\n`;
-    fm.writeString(filePath, header + entry);
+    const fmCore = `type: log\ndate: ${note.date}\n`;
+    fm.writeString(filePath, rebuildLogFile(fmCore, newTags, "\n", entry));
   }
 }
 
