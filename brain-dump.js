@@ -24,6 +24,12 @@ function bookmarkDir(name) {
   return fm.bookmarkedPath(name);
 }
 
+function vaultNameFromBookmark(name) {
+  const path = fm.bookmarkedPath(name);
+  const parts = path.split('/');
+  return parts[parts.length - 1];
+}
+
 // ── Helpers ─────────────────────────────────────
 
 function todayISO() {
@@ -280,9 +286,11 @@ async function main() {
     }
   }
 
+  const vaultName = vaultNameFromBookmark(VAULT_BOOKMARK);
   const n = new Notification();
   n.title = buildSummary(counts);
   n.body  = "";
+  n.openURL = `obsidian://open?vault=${encodeURIComponent(vaultName)}`;
   n.schedule();
 
   Script.complete();
